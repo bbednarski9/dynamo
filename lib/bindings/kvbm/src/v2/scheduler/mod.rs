@@ -100,7 +100,7 @@ impl PyScheduler {
             .block_count(total_blocks)
             .block_size(config.inner.block_size)
             .registry(registry)
-            .with_lineage_backend()
+            .with_multi_lru_backend()
             .duplication_policy(BlockDuplicationPolicy::Allow)
             .build()
             .map_err(|e| {

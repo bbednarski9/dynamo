@@ -178,6 +178,11 @@ class DynamoScheduler(SchedulerInterface):
             # Use vLLM's finished_req_ids (vLLM tracks completion status, not Rust)
             rust_output.finished_req_ids = vllm_output.finished_req_ids
 
+            # Copy KV connector metadata from vLLM (required when KV connectors are enabled)
+            # The vLLM scheduler builds this based on connector configuration
+            rust_output.kv_connector_metadata = vllm_output.kv_connector_metadata
+            rust_output.ec_connector_metadata = vllm_output.ec_connector_metadata
+
             # Compare scheduling decisions (not finished_req_ids - that's completion tracking)
             self._compare_outputs(rust_output, vllm_output)
 
@@ -290,6 +295,8 @@ class DynamoScheduler(SchedulerInterface):
             scheduled_encoder_inputs=rust_output.get("scheduled_encoder_inputs", {}),
             num_common_prefix_blocks=num_common_prefix_blocks,
             free_encoder_mm_hashes=rust_output.get("free_encoder_mm_hashes", []),
+            # vLLM v0.14.0: Track preempted requests (default empty if not provided)
+            preempted_req_ids=set(rust_output.get("preempted_req_ids", [])),
         )
 
     @staticmethod
@@ -461,6 +468,20 @@ class DynamoScheduler(SchedulerInterface):
         """
         self._scheduler.update_draft_token_ids(draft_token_ids)
 
+    def update_draft_token_ids_in_output(
+        self,
+        scheduler_output: "SchedulerOutput",
+        draft_token_ids: "DraftTokenIds",
+    ) -> None:
+        """
+        Update draft token IDs in scheduler output for speculative decoding.
+
+        Args:
+            scheduler_output: The scheduler output to update
+            draft_token_ids: Draft token IDs to update in the output
+        """
+        self._scheduler.update_draft_token_ids_in_output(scheduler_output, draft_token_ids)
+
     def add_request(self, request: "Request") -> None:
         """
         Add a new request to the scheduler.
@@ -576,6 +597,15 @@ class DynamoScheduler(SchedulerInterface):
     # new in vllm v0.11
     def get_kv_connector(self) -> Optional[KVConnectorBase_V1]:
         return None
+
+    # new in vllm v0.14 - connector property for direct access
+    @property
+    def connector(self) -> Optional[KVConnectorBase_V1]:
+        """
+        Property to access KV connector directly.
+        vLLM v0.14+ accesses scheduler.connector instead of get_kv_connector().
+        """
+        return self.get_kv_connector()
 
     # new in vllm v0.12
     def get_grammar_bitmask(self, scheduler_output: "SchedulerOutput"):

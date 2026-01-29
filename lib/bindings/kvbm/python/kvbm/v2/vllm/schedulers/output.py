@@ -81,6 +81,8 @@ class RustSchedulerOutput:
     pending_structured_output_tokens: bool = False
     kv_connector_metadata: Any | None = None
     ec_connector_metadata: Any | None = None
+    # Added in vLLM v0.14.0 - IDs of requests that were preempted this step
+    preempted_req_ids: Set[str] = field(default_factory=set)
 
     @classmethod
     def make_empty(cls) -> "RustSchedulerOutput":
